@@ -4,7 +4,10 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 
-mod functions;
+use crate::patient_fn::delete_patients_by_id;
+use crate::patient_fn::find_patients_by_id;
+
+mod patient_fn;
 
 //TODO, Add a feature to get info from file to command line
 //Model data using FHIR (Fast Healthcare Interoperability Resources) basics.
@@ -20,63 +23,64 @@ struct Cli {
 #[derive(Parser)]
 enum Commands {
     Add {
-        #[arg(long)]
-        id:i32,
+        #[arg(long, help = "Add a --id of the patient")]
+        id: i32,
         #[arg(long, help = "Add a --name of the patient")]
         name: String,
         #[arg(long, help = "Add the --diagnostics of the patient")]
-        diagnostics: String,
+        diagnosis: String,
         #[arg(long, help = "What --medicine should they have")]
         medication: String,
         #[arg(long)]
-        dates:String,
+        dates: String,
     },
     View {
         #[arg(long)]
-        id:i32
+        id: i32,
     },
     Update {
         #[arg(long)]
-        id:i32,
+        id: i32,
     },
 
     Delete {
         #[arg(long)]
-        id:i32,
+        id: i32,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct Patient {
-    id:i32
-    name: String,
-    diagnosis: String,
-    medication: String,
-    dates:String,
 }
 
 fn main() {
     let cli = Cli::parse();
     match &cli.command {
         Commands::Add {
+            id,
             name,
-            diagnostics,
-            medicine,
+            diagnosis,
+            medication,
+            dates,
         } => {
-            let patient = Patient {
+            let patient = patient_fn::Patient {
+                id: id.clone(),
                 name: name.clone(),
-                diagnosis: diagnostics.clone(),
-                medication: medicine.clone(),
+                diagnosis: diagnosis.clone(),
+                medication: medication.clone(),
+                dates: dates.clone(),
             };
-            patient_file_management(&patient).unwrap();
+            patient.patient_file_management().unwrap();
+        }
+        Commands::View { id } => match find_patients_by_id(*id) {
+            Ok(Some(p)) => println!("Found: {:?}", p),
+            Ok(None) => println!("Patient not found."),
+            Err(e) => println!("Error: {}", e),
         },
-        Commands::View {id}=>{},
-        Commands::Update {id}=>{
-            let patient = retreave_patient_json();
-            println!("Update: {} -> Options: ",patient.name)
+        Commands::Update { id } => {
+            //let patient = retreave_patient_json();
+            //println!("Update: {} -> Options: ", patient.name);
             let options = String::new();
+        }
+        Commands::Delete { id } => match delete_patients_by_id(*id) {
+            Ok(_) => println!("Patient deleted."),
+            Err(e) => println!("Error: {}", e),
         },
-        Commands::Delete {id}=>{},
-
     }
 }

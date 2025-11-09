@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "name": "John Doe",
+    "diagnosis": "ligma",
+    "medication": "snake oil",
+    "dates": "11/02/25"
+  },
+  {
+    "id": 2,
+    "name": "Jenny Penny",
+    "diagnosis": "Hypothemea",
+    "medication": "water",
+    "dates": "nill"
+  },
+  {
+    "id": 12,
+    "name": "Luke Mccoii",
+    "diagnosis": "nil",
+    "medication": "qinoa",
+    "dates": "13/04/24"
+  },
+  {
+    "id": 13,
+    "name": "Lucy",
+    "diagnosis": "nil",
+    "medication": "qinoa",
+    "dates": "13/04/24"
+  }
+]

@@ -6,11 +6,14 @@ use std::io::Read;
 
 use crate::patient_fn::delete_patients_by_id;
 use crate::patient_fn::find_patients_by_id;
+use crate::patient_fn::input_reader_cli;
+use crate::patient_fn::list_patients;
 
 mod patient_fn;
 
-//TODO, Add a feature to get info from file to command line
-//Model data using FHIR (Fast Healthcare Interoperability Resources) basics.
+//TODO:
+//~Sometimes ID's can clash. Find a way to improve upon that.
+//~Structure data using FHIR (Fast Healthcare Interoperability Resources) basics.
 
 #[derive(Parser)]
 #[command(name = "Patient Record Organizer CLI (in Rust)")]
@@ -47,6 +50,9 @@ enum Commands {
         #[arg(long)]
         id: i32,
     },
+    List {
+        //Ill add exeptions later
+    },
 }
 
 fn main() {
@@ -74,13 +80,12 @@ fn main() {
             Err(e) => println!("Error: {}", e),
         },
         Commands::Update { id } => {
-            //let patient = retreave_patient_json();
-            //println!("Update: {} -> Options: ", patient.name);
-            let options = String::new();
+            let _ = input_reader_cli(*id);
         }
         Commands::Delete { id } => match delete_patients_by_id(*id) {
             Ok(_) => println!("Patient deleted."),
             Err(e) => println!("Error: {}", e),
         },
+        Commands::List {} => list_patients(),
     }
 }

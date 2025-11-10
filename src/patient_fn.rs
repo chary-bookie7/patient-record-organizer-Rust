@@ -1,16 +1,14 @@
-//use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::File;
-use std::fs::read_to_string;
 use std::io;
 use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
 const PATIENTS_FILE: &str = "patients.json";
+
 macro_rules! update_field {
     ($patient:expr, $field:expr, $value:expr, $type:ty) => {
         match $field {
@@ -33,17 +31,10 @@ pub struct Patient {
     pub medication: String,
     pub dates: String,
 }
+
 impl Patient {
     pub fn patient_file_management(&self) -> std::io::Result<()> {
-        let mut patients: Vec<Patient> = if fs::metadata(PATIENTS_FILE).is_ok() {
-            let mut file = fs::File::open(PATIENTS_FILE)?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents)?;
-            serde_json::from_str(&contents).unwrap_or_else(|_| vec![])
-        } else {
-            vec![]
-        };
-        match add_patient(patients, self) {
+        match add_patient(self) {
             Ok(_) => {}
             Err(e) => {
                 println!("{e}")
@@ -54,18 +45,31 @@ impl Patient {
         Ok(())
     }
 }
-//Self explanitory...read serde documentation for more info
-pub fn add_patient(
-    mut patients: Vec<Patient>,
+
+pub fn add_patient(patient: &Patient) -> Result<(), Box<dyn std::error::Error>> {
+    add_patient_with_file(patient, PATIENTS_FILE)
+}
+
+pub fn add_patient_with_file(
     patient: &Patient,
+    file_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut patients: Vec<Patient> = if fs::metadata(file_path).is_ok() {
+        let mut file = fs::File::open(file_path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        serde_json::from_str(&contents).unwrap_or_else(|_| vec![])
+    } else {
+        vec![]
+    };
+
     if patients.iter().any(|p| p.id == patient.id) {
         println!("Looking for ID {} ...", patient.id);
         return Err("Patient with this ID already exists".into());
     }
 
     patients.push(patient.clone());
-    save_patients(&patients)?;
+    save_patients_to_file(&patients, file_path)?;
 
     Ok(())
 }
@@ -79,29 +83,50 @@ pub fn list_patients() {
             }
         }
         Err(e) => {
-            println!("We have a problen: {}", e);
+            println!("We have a problem: {}", e);
         }
     };
 }
 
 pub fn find_patients_by_id(id: i32) -> Result<Option<Patient>, Box<dyn std::error::Error>> {
-    let data = fs::read_to_string(PATIENTS_FILE)?;
+    find_patients_by_id_with_file(id, PATIENTS_FILE)
+}
+
+pub fn find_patients_by_id_with_file(
+    id: i32,
+    file_path: &str,
+) -> Result<Option<Patient>, Box<dyn std::error::Error>> {
+    let data = fs::read_to_string(file_path)?;
     let patients: Vec<Patient> = serde_json::from_str(&data)?;
 
     Ok(patients.into_iter().find(|p| p.id == id))
 }
 
 pub fn delete_patients_by_id(id: i32) -> Result<(), Box<dyn std::error::Error>> {
-    let data = fs::read_to_string(PATIENTS_FILE)?;
+    delete_patients_by_id_with_file(id, PATIENTS_FILE)
+}
+
+pub fn delete_patients_by_id_with_file(
+    id: i32,
+    file_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = fs::read_to_string(file_path)?;
     let patients: Vec<Patient> = serde_json::from_str(&data)?;
     let filtered: Vec<Patient> = patients.into_iter().filter(|p| p.id != id).collect();
 
-    fs::write(PATIENTS_FILE, serde_json::to_string_pretty(&filtered)?)?;
+    fs::write(file_path, serde_json::to_string_pretty(&filtered)?)?;
     Ok(())
 }
 
 pub fn input_reader_cli(id: i32) -> Result<(), Box<dyn std::error::Error>> {
-    let data = fs::read_to_string(PATIENTS_FILE)?;
+    input_reader_cli_with_file(id, PATIENTS_FILE)
+}
+
+pub fn input_reader_cli_with_file(
+    id: i32,
+    file_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = fs::read_to_string(file_path)?;
     let mut patients: Vec<Patient> = serde_json::from_str(&data)?;
 
     let stdout = io::stdout();
@@ -113,7 +138,6 @@ pub fn input_reader_cli(id: i32) -> Result<(), Box<dyn std::error::Error>> {
         write_buffer,
         "\n--------------------Update--------------------"
     )?;
-    //TODO: Write clearer instructions
     writeln!(
         write_buffer,
         "Type something like --[entry] to update the said entry ... press # on a new line to end;\n ,,,"
@@ -121,7 +145,6 @@ pub fn input_reader_cli(id: i32) -> Result<(), Box<dyn std::error::Error>> {
     write_buffer.flush()?;
 
     let reader = io::stdin().lock();
-    // Getting user input from cmd
     for line in reader.lines() {
         counter += 1;
         if let Ok(line) = line {
@@ -132,11 +155,11 @@ pub fn input_reader_cli(id: i32) -> Result<(), Box<dyn std::error::Error>> {
             user_input.push('\n');
         }
         if counter == 5 {
-            break; // Counter dictates how many lines are possible so that users wont be stuck in an input loop.
+            break;
         }
     }
 
-    let parsed_args = parse_arguments(&user_input); //This parses user input into args as a hash
+    let parsed_args = parse_arguments(&user_input);
     for patient in &mut patients {
         if patient.id == id {
             for key in parsed_args.keys() {
@@ -149,7 +172,7 @@ pub fn input_reader_cli(id: i32) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     write_buffer.flush()?;
-    save_patients(&patients)?;
+    save_patients_to_file(&patients, file_path)?;
 
     Ok(())
 }
@@ -160,11 +183,17 @@ fn load_patients() -> Result<Vec<Patient>, Box<dyn std::error::Error>> {
 }
 
 fn save_patients(patients: &Vec<Patient>) -> Result<(), Box<dyn std::error::Error>> {
-    fs::write(PATIENTS_FILE, to_string_pretty(patients)?)?;
+    save_patients_to_file(patients, PATIENTS_FILE)
+}
+
+fn save_patients_to_file(
+    patients: &Vec<Patient>,
+    file_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fs::write(file_path, to_string_pretty(patients)?)?;
     Ok(())
 }
 
-//To complicated for me, shouldve used clap... welp too late. Code may or may not break. Ill fix this later.
 fn parse_arguments(input: &str) -> HashMap<String, String> {
     let mut args = HashMap::new();
     let mut tokens = input.split_whitespace();
